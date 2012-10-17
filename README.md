@@ -8,5 +8,5 @@ Once installed go to:
 http:/127.0.0.1:8000/<your_app>/plugin_basicgrid/index
 
 #Screenshot
-![Screenshot](http://github.com/mbelletti/web2py-basicgrid.git/screenshot.png)
+![Screenshot](https://raw.github.com/mbelletti/web2py-basicgrid/master/screenshot.png)
 
