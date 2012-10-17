@@ -143,7 +143,6 @@ class BasicGrid(object):
                         attrcol.update(_class=coldict['class'])
                     row.append(TH(coldict['label'],**attrcol))
                 elif orderby:
-                    print 'table', self.next_orderby
                     if self.next_orderby.split('~')[-1] == c:
                         u = self.next_orderby
                     else:

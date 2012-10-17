@@ -1,17 +1,4 @@
 {{extend 'layout.html'}}
-<script>
-<!--
-function getData(value){
-        $.get("/mini/plugin_basicgrid/grid.load",{search_string:value},function(result){
-        $("#grid_grid").html($(result).contents()); 
-        });
-    }
-//-->
-</script>
-
-<form action="" class="form-search" enctype="multipart/form-data" method="post">
-<label>Search:</label>
-<input type="text" value="" class="input-medium search-query" onkeyup="getData(this.value);"/>
-</form>
+{{=search}}
 
 {{=LOAD('plugin_basicgrid', 'grid.load', ajax=True, target="list_products")}}

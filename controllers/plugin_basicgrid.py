@@ -8,11 +8,17 @@ db.define_table('product',
     Field('publish_end_date', 'date', label='end'),
     Field('price', 'integer', represent=lambda v: '$%s' % v ), 
     )
-populate(db.product, 40)
+populate(db.product, 15)
 
 #----------------------------------------------------------------------
 def index():
-    """"""
+    """
+    Si appoggia a grid
+    """
+    from plugin_basicgrid import BasicGrid
+    # Passo a render_search 
+    search = BasicGrid.render_search(search_action='grid')
+    
     return locals()
 
 def grid():
