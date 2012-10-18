@@ -3,6 +3,7 @@
 from gluon import *
 from gluon.globals import current
 from dal import SQLDB, GQLDB
+from gluon.dal import Row, Expression
 from gluon.sqlhtml import represent
 
 import re
@@ -47,6 +48,7 @@ class BasicGrid(object):
     #----------------------------------------------------------------------
     def __helper__(self):
         """"""
+          
         orderby_field = None
         request = current.request
         session = current.session        
@@ -66,11 +68,12 @@ class BasicGrid(object):
             else:                   
                 self.next_orderby = orderby[1:] if orderby[0] == '~' else '~' + orderby
                         
-            table, field = orderby.split('~')[-1].split('.')
             session['%s_%s_%s' % (self.ctrl, self.method, 'last_orderby')] = orderby
-            orderby_field = self.db[table][field]
-            if orderby[0] == '~':
-                orderby_field = ~self.db[table][field]
+            table, field = orderby.split('~')[-1].split('.')
+            try:
+                orderby_field = self.db[table][field]
+            except:
+                orderby_field = Expression(self.db, orderby.split('~')[-1])
         try:
             page = int(request.vars.page)
         except:
@@ -82,7 +85,7 @@ class BasicGrid(object):
     def table(self, 
               *args,
               **attributes):
-        self.cid = attributes['cid']
+        #self.cid = attributes['cid'] or ''
         request = current.request
         session = current.session
         attributes['_id'] = 'rawtable_' + self.method
@@ -123,7 +126,7 @@ class BasicGrid(object):
         if headers=='fieldname:capitalize':
             headers = {}
             for c in columns:
-                headers[c] = c.split('.')[-1].replace('_',' ').title()
+                headers[c] = c.title() #c.split('.')[-1].replace('_',' ').title()
         elif headers=='labels':
             headers = {}
             for c in columns:
@@ -137,12 +140,21 @@ class BasicGrid(object):
                 if isinstance(headers.get(c, c), dict):
                     coldict = headers.get(c, c)
                     attrcol = dict()
-                    if coldict['width']!="":
+                    if coldict.has_key('width'):
                         attrcol.update(_width=coldict['width'])
-                    if coldict['class']!="":
-                        attrcol.update(_class=coldict['class'])
-                    row.append(TH(coldict['label'],**attrcol))
+                    if coldict.has_key('class'):
+                        attrcol.update(_class=coldict['class'])  
+                    if orderby:
+                        if self.next_orderby.split('~')[-1] == c:
+                            u = self.next_orderby
+                        else:
+                            u = c
+                        _href = th_link+'?orderby=' + u
+                        row.append(TH(A(coldict['label'], _href=_href),**attrcol))                        
+                    else:
+                        row.append(TH(coldict['label'],**attrcol))
                 elif orderby:
+                    print 'table', self.next_orderby
                     if self.next_orderby.split('~')[-1] == c:
                         u = self.next_orderby
                     else:
@@ -278,8 +290,8 @@ class BasicGrid(object):
         table.append(TBODY(*tbody))
 
         return DIV(table, _class='web2py_table')
-        
 
+    
     def render_paginate(self):
         """Paginate"""
 
@@ -348,3 +360,5 @@ class BasicGrid(object):
     }""" % {'url':URL(r=request,f=search_action, extension='load'), 'grid_id': 'grid_' + search_action})
 
         return FORM(script, label, search, _class='form-search') 
+
+    
