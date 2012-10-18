@@ -131,8 +131,12 @@ class BasicGrid(object):
             headers = {}
             for c in columns:
                 (t,f) = c.split('.')
-                field = sqlrows.db[t][f]
-                headers[c] = field.label
+                try:
+                    field = sqlrows.db[t][f]
+                    headers[c] = field.label
+                except:
+                    headers[c] = c
+                    
         if headers is None:
             headers = {}
         else:
