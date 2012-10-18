@@ -3,7 +3,7 @@
 from gluon import *
 from gluon.globals import current
 from dal import SQLDB, GQLDB
-from gluon.dal import Row, Expression
+from gluon.dal import Row, Rows, Expression
 from gluon.sqlhtml import represent
 
 import re
@@ -158,7 +158,6 @@ class BasicGrid(object):
                     else:
                         row.append(TH(coldict['label'],**attrcol))
                 elif orderby:
-                    print 'table', self.next_orderby
                     if self.next_orderby.split('~')[-1] == c:
                         u = self.next_orderby
                     else:
@@ -184,113 +183,122 @@ class BasicGrid(object):
         table = TABLE(thead, **attributes)
         
         tbody = []
-        for (rc, record) in enumerate(sqlrows):
-            row = []
-
-            if not selectid is None: #new implement
-                if record.get('id') == selectid:
-                    _class += ' rowselected'
-
-            for colname in columns:
-                if not table_field.match(colname):
-                    if "_extra" in record and colname in record._extra:
-                        r = record._extra[colname]
-                        row.append(TD(r))
-                        continue
-                    else:
-                        raise KeyError("Column %s not found (SQLTABLE)" % colname)
-                (tablename, fieldname) = colname.split('.')
-                try:
-                    field = sqlrows.db[tablename][fieldname]
-                except KeyError:
-                    field = None
-                if tablename in record \
-                        and isinstance(record,Row) \
-                        and isinstance(record[tablename],Row):
-                    r = record[tablename][fieldname]
-                elif fieldname in record:
-                    r = record[fieldname]
-                else:
-                    raise SyntaxError, 'something wrong in Rows object'
-                r_old = r
-                if not field:
-                    pass
-                elif linkto and field.type == 'id':
+        if isinstance(sqlrows, Rows):
+            for (rc, record) in enumerate(sqlrows):
+                row = []
+    
+                if not selectid is None: #new implement
+                    if record.get('id') == selectid:
+                        _class += ' rowselected'
+    
+                for colname in columns:
+                    if not table_field.match(colname):
+                        if "_extra" in record and colname in record._extra:
+                            r = record._extra[colname]
+                            row.append(TD(r))
+                            continue
+                        else:
+                            raise KeyError("Column %s not found (SQLTABLE)" % colname)
+                    (tablename, fieldname) = colname.split('.')
                     try:
-                        href = linkto(r, 'table', tablename)
-                    except TypeError:
-                        href = '%s/%s/%s' % (linkto, tablename, r_old)
-                    r = A(r, _href=href)
-                elif isinstance(field.type, str) and field.type.startswith('reference'):
-                    if linkto:
-                        ref = field.type[10:]
+                        field = sqlrows.db[tablename][fieldname]
+                    except KeyError:
+                        field = None
+                    if tablename in record \
+                            and isinstance(record,Row) \
+                            and isinstance(record[tablename],Row):
+                        r = record[tablename][fieldname]
+                    elif fieldname in record:
+                        r = record[fieldname]
+                    else:
+                        raise SyntaxError, 'something wrong in Rows object'
+                    r_old = r
+                    if not field:
+                        pass
+                    elif linkto and field.type == 'id':
                         try:
-                            href = linkto(r, 'reference', ref)
+                            href = linkto(r, 'table', tablename)
                         except TypeError:
-                            href = '%s/%s/%s' % (linkto, ref, r_old)
-                            if ref.find('.') >= 0:
-                                tref,fref = ref.split('.')
-                                if hasattr(sqlrows.db[tref],'_primarykey'):
-                                    href = '%s/%s?%s' % (linkto, tref, urllib.urlencode({fref:r}))
-                        r = A(represent(field,r,record), _href=str(href))
+                            href = '%s/%s/%s' % (linkto, tablename, r_old)
+                        r = A(r, _href=href)
+                    elif isinstance(field.type, str) and field.type.startswith('reference'):
+                        if linkto:
+                            ref = field.type[10:]
+                            try:
+                                href = linkto(r, 'reference', ref)
+                            except TypeError:
+                                href = '%s/%s/%s' % (linkto, ref, r_old)
+                                if ref.find('.') >= 0:
+                                    tref,fref = ref.split('.')
+                                    if hasattr(sqlrows.db[tref],'_primarykey'):
+                                        href = '%s/%s?%s' % (linkto, tref, urllib.urlencode({fref:r}))
+                            r = A(represent(field,r,record), _href=str(href))
+                        elif field.represent:
+                            r = represent(field,r,record)
+                    elif linkto and hasattr(field._table,'_primarykey')\
+                            and fieldname in field._table._primarykey:
+                        # have to test this with multi-key tables
+                        key = urllib.urlencode(dict( [ \
+                                    ((tablename in record \
+                                          and isinstance(record, Row) \
+                                          and isinstance(record[tablename], Row)) and
+                                     (k, record[tablename][k])) or (k, record[k]) \
+                                        for k in field._table._primarykey ] ))
+                        r = A(r, _href='%s/%s?%s' % (linkto, tablename, key))
+                    elif isinstance(field.type, str) and field.type.startswith('list:'):
+                        r = represent(field,r or [],record)
                     elif field.represent:
                         r = represent(field,r,record)
-                elif linkto and hasattr(field._table,'_primarykey')\
-                        and fieldname in field._table._primarykey:
-                    # have to test this with multi-key tables
-                    key = urllib.urlencode(dict( [ \
-                                ((tablename in record \
-                                      and isinstance(record, Row) \
-                                      and isinstance(record[tablename], Row)) and
-                                 (k, record[tablename][k])) or (k, record[k]) \
-                                    for k in field._table._primarykey ] ))
-                    r = A(r, _href='%s/%s?%s' % (linkto, tablename, key))
-                elif isinstance(field.type, str) and field.type.startswith('list:'):
-                    r = represent(field,r or [],record)
-                elif field.represent:
-                    r = represent(field,r,record)
-                elif field.type == 'blob' and r:
-                    r = 'DATA'
-                elif field.type == 'boolean':
-                    r = INPUT(_type='checkbox', value=r, _disabled='')                   
-                elif field.type == 'upload':
-                    if upload and r:
-                        r = A(current.T('file'), _href='%s/%s' % (upload, r))
-                    elif r:
-                        r = current.T('file')
-                    else:
-                        r = ''
-                elif field.type in ['string','text']:
-                    r = str(field.formatter(r))
-                    if headers!={}: #new implement dict
+                    elif field.type == 'blob' and r:
+                        r = 'DATA'
+                    elif field.type == 'boolean':
+                        r = INPUT(_type='checkbox', value=r, _disabled='')                   
+                    elif field.type == 'upload':
+                        if upload and r:
+                            r = A(current.T('file'), _href='%s/%s' % (upload, r))
+                        elif r:
+                            r = current.T('file')
+                        else:
+                            r = ''
+                    elif field.type in ['string','text']:
+                        r = str(field.formatter(r))
+                        if headers!={}: #new implement dict
+                            if isinstance(headers[colname],dict):
+                                if isinstance(headers[colname]['truncate'], int):
+                                    r = truncate_string(r, headers[colname]['truncate'])
+                        elif not truncate is None:
+                            r = truncate_string(r, truncate)
+                    attrcol = dict()#new implement dict
+                    if headers!={}:
                         if isinstance(headers[colname],dict):
-                            if isinstance(headers[colname]['truncate'], int):
-                                r = truncate_string(r, headers[colname]['truncate'])
-                    elif not truncate is None:
-                        r = truncate_string(r, truncate)
-                attrcol = dict()#new implement dict
-                if headers!={}:
-                    if isinstance(headers[colname],dict):
-                        colclass=headers[colname]['class']
-                        if headers[colname]['selected']:
-                            colclass= str(headers[colname]['class'] + " colselected").strip()
+                            colclass=headers[colname]['class']
+                            if headers[colname]['selected']:
+                                colclass= str(headers[colname]['class'] + " colselected").strip()
+                            if colclass!="":
+                                attrcol.update(_class=colclass)
+    
+                    row.append(TD(r,**attrcol))
+    
+                if extracolumns:#new implement dict
+                    for c in extracolumns:
+                        attrcol = dict()
+                        colclass=c['class']
+                        if c['selected']:
+                            colclass= str(c['class'] + " colselected").strip()
                         if colclass!="":
                             attrcol.update(_class=colclass)
-
-                row.append(TD(r,**attrcol))
-
-            if extracolumns:#new implement dict
-                for c in extracolumns:
-                    attrcol = dict()
-                    colclass=c['class']
-                    if c['selected']:
-                        colclass= str(c['class'] + " colselected").strip()
-                    if colclass!="":
-                        attrcol.update(_class=colclass)
-                    contentfunc = c['content']
-                    row.append(TD(contentfunc(record, rc),**attrcol))
-
-            tbody.append(TR(*row))        
+                        contentfunc = c['content']
+                        row.append(TD(contentfunc(record, rc),**attrcol))
+    
+                tbody.append(TR(*row))        
+        else:
+            for r in sqlrows:
+                row = []
+                for v in r:
+                    row.append(TD(v))
+                tbody.append(TR(*row))        
+                
+            
         table.append(TBODY(*tbody))
 
         return DIV(table, _class='web2py_table')
