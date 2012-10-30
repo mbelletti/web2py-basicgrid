@@ -15,39 +15,33 @@ def index():
     """
     Si appoggia a grid
     """
-    from plugin_basicgrid import BasicGrid
+    from plugin_basicgrid import Grid
     # Passo a render_search 
-    search = BasicGrid.render_search(search_action='grid')
+    search = Grid.render_search(search_action='grid')
     
     return locals()
 
+
 def grid():
-    from plugin_basicgrid import BasicGrid
-    basic_grid = BasicGrid(db, 
-                           __file__.split('/')[-1][:-3], 
-                           'grid', 
-                           rows_per_page=10)
-    helper = basic_grid.helper
-    limit_inf = (basic_grid.rows_per_page * helper['page']) - basic_grid.rows_per_page
-    limit_sup = limit_inf + basic_grid.rows_per_page
-    query = (db.product.id > 0)
-    query = query & (db.product.name.like('%' +  helper['search_string'] + '%'))
-
-    basic_grid.rows_count = db(query).count()
+    from plugin_basicgrid import Grid
     
-    rows = db(query).select(orderby=helper['orderby'],limitby=(limit_inf, limit_sup))
+    query = None
+    
+    grid = Grid(db,
+                fields=[db.product.id, 
+                        db.product.name, 
+                        db.product.description,
+                        db.product.publish_start_date,
+                        db.product.publish_end_date,
+                        db.product.price],
+                search_fields = [db.product.name, db.product.description],
+                ctrl=__file__.split('/')[-1][:-3], 
+                method=request.function, 
+                default_orderby=db.product.name,
+                rows_per_page=10,
+                cid = 'list_products')
 
-    grid = basic_grid.table(rows, 
-              columns=['product.id', 
-                       'product.name', 
-                       'product.description',
-                       'product.publish_start_date',
-                       'product.publish_end_date',
-                       'product.price'],
-              headers='labels',
-              linkto=lambda r, mode, table: URL('show', args=[r]),
-              cid='list_products'
-              )
+    grid = DIV(grid.grid)
 
     return locals()
 
