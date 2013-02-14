@@ -5,7 +5,7 @@ BasicGrid is a Web2Py plugin that like SQLTABLE, given a Rows object generates a
 
 #Demo
 Once installed go to:
-http:/127.0.0.1:8000/<your_app>/plugin_basicgrid/index
+http:/127.0.0.1:8000/your_app/plugin_basicgrid/index
 
 #Screenshot
 ![Screenshot](https://raw.github.com/mbelletti/web2py-basicgrid/master/screenshot.png)
