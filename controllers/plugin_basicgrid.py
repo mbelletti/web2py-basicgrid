@@ -17,15 +17,14 @@ def index():
     """
     from plugin_basicgrid import Grid
     # Passo a render_search 
-    search = Grid.render_search(show_function='show',
-                                search_function='list')
+    search = Grid.render_search()
     
     return locals()
 
 
 def show():
     """"""
-    rid = request.vars.get('rid') or None
+    rid = request.vars.get('avalue') or None
     record = db.product(rid)
     form = SQLFORM(db.product, record, readonly=True)
     return form
@@ -46,6 +45,8 @@ def list():
                 search_fields = [db.product.name, db.product.description],
                 default_orderby=db.product.name,
                 rows_for_page=10,
+                show_function='show',
+                search_function='list',                                
                 cid = 'list_products')
 
     grid = DIV(grid.grid)

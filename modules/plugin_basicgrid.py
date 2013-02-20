@@ -17,21 +17,9 @@ table_field = re.compile('[\w_]+\.[\w_]+')
 class Grid(object):
     """ This an example on how to make a grid to use with rawsql """
     
-    template = '''function getData(value){
-        $.get("$search_url",{search_string:value},function(result){
-        $("#$grid_id").html($(result).contents()); 
-        showDetail(false);
-        });
-    }
-    function getRow(value){
-                $.get("$show_url",{rid:value},function(result){
-                    $("#$grid_id").html($(result).contents()); 
-                    showDetail(true);
-                    
-                });
-    }
-    function showDetail(value){
-            if (value == true) {
+    template = '''function getData(grid_id, url, value, show_detail){
+        $("#" + grid_id).load(url,{"avalue": value}, function(result) {
+            if (show_detail == true) {
                  $("#$search_form_id").hide();
                  $("#$cancel_button_id").show();
 
@@ -39,9 +27,9 @@ class Grid(object):
                  $("#$search_form_id").show();            
                  $("#$cancel_button_id").hide();
             }
+        
+        });
     }
-    
-    
     '''
     
     def __init__(self, 
@@ -53,6 +41,8 @@ class Grid(object):
                  rows_for_page=10, 
                  default_orderby=None, 
                  groupby=None, 
+                 show_function=None,
+                 search_function='list',
                  cid=None,
                  ui=None):
         """ Init """
@@ -75,6 +65,8 @@ class Grid(object):
         self.ctrl = request.controller
         self.method = request.function
         self.grid_id = 'grid_' + self.method
+        self.show_function = show_function
+        self.search_function = search_function
         self.page = self.pages = 0
         self.rows = None
         self.cid = cid
@@ -120,7 +112,7 @@ class Grid(object):
             self.cid = session['%s_%s_%s' % (self.ctrl, self.method, 'cid')]
 
         orderby = request.vars.get('orderby') or self.default_orderby
-        self.search_string = request.vars.get('search_string') or ''
+        self.search_string = request.vars.get('avalue') or ''
 
         self.next_orderby = orderby or ''
         if orderby and not isinstance(orderby, Expression):
@@ -160,9 +152,11 @@ class Grid(object):
         if self.search_fields:
             for field in self.search_fields:
                 if qs:
-                    qs = qs | field.like('%' + self.search_string + '%')
+                    if self.search_string:
+                        qs = qs | field.like('%' +  + '%')
                 else:
-                    qs = field.like('%' + self.search_string + '%')
+                    if self.search_string:
+                        qs = field.like('%' + self.search_string + '%')
             query = self.query & qs if self.query else qs
         else:
             query = self.query
@@ -378,10 +372,17 @@ class Grid(object):
                     contentfunc = c['content']
                     row.append(TD(contentfunc(record, rc),**attrcol))
                 
-            
-            tbody.append(TR(*row, 
-                            _id='%s_%s_row_%d' % (self.ctrl, self.method, record[self.field_id]),
-                            _onclick="getRow(" + str(record[self.field_id]) + "); return false;"))
+            if self.show_function:
+                tbody.append(TR(*row, 
+                                _id='%s_%s_row_%d' % (self.ctrl, self.method, record[self.field_id]),
+                                _onclick='getData("%(grid_id)s", "%(url)s", %(value)s, %(detail)s); return false;' %
+                                {'grid_id': self.grid_id, 
+                                 'url': URL(r=request, f=self.show_function, extension='load'),
+                                 'value': str(record[self.field_id]),
+                                 'detail': 'true'}
+                            ))
+            else:
+                tbody.append(TR(*row, _id='%s_%s_row_%d' % (self.ctrl, self.method, record[self.field_id])))
         table.append(TBODY(*tbody))        
 
         return DIV(table, _class='web2py_table')
@@ -447,14 +448,21 @@ class Grid(object):
         id_search_form = '%s_%s_searchform' % (request.controller, request.function)
         id_cancelbutton = '%s_%s_cancelbutton' % (request.controller, request.function)
         label = ""#LABEL('Search: ')
-        search = INPUT(_type='text', _value="", _placeholder="Search", _class="search-query", _onkeyup='getData(this.value);')
+        search = INPUT(_type='text', _value="", _placeholder="Search", _class="search-query", 
+                       _onkeyup='getData("%(grid_id)s", "%(url)s", this.value, false); return false;' %
+                       {'grid_id': 'grid_' +  search_function, 
+                        'url': URL(r=request, f=search_function, extension='load')})
         search_form = DIV(DIV(
             Grid.script(show_function=show_function, search_function=search_function), 
-            FORM(label, search, _class='form-search'),
+            DIV(label, search, _class='form-search'),
             _id=id_search_form),
             BUTTON('Elenco',
-                   _onclick='getData($("#%s input.search-query").val()); return false;' % (id_search_form), 
-                   _id=id_cancelbutton, _style='display:none;')            
+                   _onclick='getData("%(grid_id)s", "%(url)s", %(value)s, false); return false;' %
+                   {'grid_id': 'grid_' +  search_function, 
+                    'url': URL(r=request, f=search_function, extension='load'),
+                    'value': '$("#%s input.search-query").val()' % id_search_form},
+                   _id=id_cancelbutton, _style='display:none;'),
+            HR(),
         )
         
         return search_form
